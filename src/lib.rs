@@ -1,5 +1,5 @@
 mod catalog;
-mod error;
+pub mod error;
 mod postgrest;
 
 pub use catalog::get_catalog;
