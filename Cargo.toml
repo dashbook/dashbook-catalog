@@ -1,0 +1,16 @@
+[package]
+name = "dashbook-catalog"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aws-config = "0.56.1"
+aws-sdk-sts = "0.30.0"
+iceberg-catalog-nessie = { git = "https://github.com/dashbook/iceberg-catalog-nessie-rust.git" }
+iceberg-rust = { git = "https://github.com/JanKaul/iceberg-rust_archive.git" }
+postgrest = "1.6.0"
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0.188", features = ["derive"] }
+thiserror = "1.0.48"
