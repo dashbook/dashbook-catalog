@@ -14,7 +14,8 @@ pub async fn get_catalog(
     catalog_url: &str,
     access_token: &str,
     id_token: &str,
-    identifier: &str,
+    table_namespace: &str,
+    table_name: &str,
     role: &str,
 ) -> Result<Arc<dyn Catalog>, Error> {
     let mut configuration = Configuration::new();
@@ -24,14 +25,6 @@ pub async fn get_catalog(
     let catalog_name = catalog_url.split("/").last().ok_or(Error::Other(
         "Catalog url doesn't contain catalog name.".to_string(),
     ))?;
-
-    let (table_namespace, table_name) = {
-        let mut parts: Vec<String> = identifier.split(".").map(|x| x.to_owned()).collect();
-        let table_name = parts.pop().ok_or(Error::Other(
-            "Table identifier doesn't contain table name.".to_string(),
-        ))?;
-        (parts.join("."), table_name)
-    };
 
     let account = get_account(access_token, catalog_name).await?;
 
