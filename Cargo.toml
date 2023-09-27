@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 aws-config = "0.56"
-aws-sdk-sts = "0.30"
+aws-sdk-sts = "0.31"
 iceberg-catalog-nessie = { git = "https://github.com/dashbook/iceberg-catalog-nessie-rust.git" }
 iceberg-rust = { git = "https://github.com/JanKaul/iceberg-rust_archive.git" }
 postgrest = "1.6"
