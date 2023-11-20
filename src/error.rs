@@ -5,7 +5,7 @@ pub enum Error {
     #[error("network error")]
     Reqwest(#[from] reqwest::Error),
     #[error("object store error")]
-    ObjectStore(#[from] iceberg_rust::object_store::Error),
+    ObjectStore(#[from] object_store::Error),
     #[error("aws error")]
     AWS(
         #[from]

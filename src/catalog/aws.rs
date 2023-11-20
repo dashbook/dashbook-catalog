@@ -1,5 +1,5 @@
 use aws_sdk_sts::config::Region;
-use iceberg_rust::object_store::{aws::AmazonS3Builder, ObjectStore};
+use object_store::{aws::AmazonS3Builder, ObjectStore};
 use std::sync::Arc;
 
 use crate::error::Error;
