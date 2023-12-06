@@ -1,10 +1,10 @@
 use postgrest::Postgrest;
 use serde::Deserialize;
+use serde_json::Value as JsonValue;
 
 use crate::error::Error;
 
 static POSTGREST_URL: &str = "https://api.dashbook.dev/rest/v1";
-static POSTGREST_ORG_URL: &str = "https://org.dashbook.dev/rest/v1";
 
 #[derive(Deserialize)]
 pub(crate) struct Role {
@@ -23,12 +23,15 @@ pub(crate) struct Account {
 }
 
 pub(crate) async fn get_account(access_token: &str, catalog_name: &str) -> Result<Account, Error> {
-    let postgrest = Postgrest::new(POSTGREST_ORG_URL)
+    let postgrest = Postgrest::new(POSTGREST_URL)
         .insert_header("Authorization", "Bearer ".to_string() + access_token);
 
+    let organization = get_organization(access_token)?;
+
     let mut account: Vec<Account> = postgrest
-        .from("catalogs")
+        .from("catalog")
         .select("cloud_account_id,cloud_region")
+        .eq("organization_id", organization)
         .eq("catalog_name", catalog_name)
         .limit(1)
         .execute()
@@ -73,9 +76,12 @@ pub(crate) async fn get_namespace_role(
     let postgrest = Postgrest::new(POSTGREST_URL)
         .insert_header("Authorization", "Bearer ".to_string() + access_token);
 
+    let organization = get_organization(access_token)?;
+
     let mut role: Vec<Role> = postgrest
         .from("namespace_permission")
         .select("role_id")
+        .eq("organization_id", organization)
         .eq("catalog_name", catalog_name)
         .eq("table_namespace", table_namespace)
         .eq("permissions->>".to_string() + permission, "true")
@@ -98,9 +104,12 @@ pub(crate) async fn get_table_role(
     let postgrest = Postgrest::new(POSTGREST_URL)
         .insert_header("Authorization", "Bearer ".to_string() + access_token);
 
+    let organization = get_organization(access_token)?;
+
     let mut role: Vec<Role> = postgrest
         .from("resource_permission")
         .select("role_id")
+        .eq("organization_id", organization)
         .eq("catalog_name", catalog_name)
         .eq("table_namespace", table_namespace)
         .eq("table_name", table_name)
@@ -123,9 +132,12 @@ pub(crate) async fn get_bucket(
     let postgrest = Postgrest::new(POSTGREST_URL)
         .insert_header("Authorization", "Bearer ".to_string() + access_token);
 
+    let organization = get_organization(access_token)?;
+
     let mut table: Vec<Table> = postgrest
-        .from("iceberg_tables")
+        .from("tabular")
         .select("metadata_location")
+        .eq("organization_id", organization)
         .eq("catalog_name", catalog_name)
         .eq("table_namespace", table_namespace)
         .eq("table_name", table_name)
@@ -148,4 +160,17 @@ pub(crate) async fn get_bucket(
         .ok_or(Error::Other("metadata location is empty".to_string()))?;
 
     Ok(bucket.to_string())
+}
+
+fn get_organization(access_token: &str) -> Result<String, Error> {
+    let json = String::from_utf8(base64_url::decode(
+        &access_token.split(".").collect::<Vec<_>>()[1],
+    )?)?;
+    let claims: JsonValue = serde_json::from_str(&json)?;
+
+    if let JsonValue::String(s) = &claims["organization"] {
+        Ok(s.to_owned())
+    } else {
+        Err(Error::Other(format!("Organization claim is not a string")))
+    }
 }

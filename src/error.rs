@@ -6,6 +6,12 @@ pub enum Error {
     Reqwest(#[from] reqwest::Error),
     #[error("object store error")]
     ObjectStore(#[from] object_store::Error),
+    #[error("Base64url decode error")]
+    Base64Url(#[from] base64_url::base64::DecodeError),
+    #[error("Utf8 encode error")]
+    UTF8(#[from] std::string::FromUtf8Error),
+    #[error("json error")]
+    JSON(#[from] serde_json::Error),
     #[error("aws error")]
     AWS(
         #[from]
