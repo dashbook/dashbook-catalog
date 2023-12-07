@@ -4,16 +4,11 @@ use serde_json::Value as JsonValue;
 
 use crate::error::Error;
 
-static POSTGREST_URL: &str = "https://api.dashbook.dev/rest/v1";
+pub(crate) static POSTGREST_URL: &str = "https://api.dashbook.dev/rest/v1";
 
 #[derive(Deserialize)]
 pub(crate) struct Role {
     pub role_id: String,
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Table {
-    pub metadata_location: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,8 +46,10 @@ pub async fn get_role(
     table_name: &str,
     permission: &str,
 ) -> Result<String, Error> {
-    let role =
-        match get_namespace_role(access_token, catalog_name, &table_namespace, permission).await? {
+    let role = match get_catalog_role(access_token, catalog_name, permission).await? {
+        None => match get_namespace_role(access_token, catalog_name, &table_namespace, permission)
+            .await?
+        {
             None => get_table_role(
                 access_token,
                 catalog_name,
@@ -63,8 +60,35 @@ pub async fn get_role(
             .await?
             .ok_or(Error::NoPermission(table_name.to_string()))?,
             Some(role) => role,
-        };
+        },
+        Some(role) => role,
+    };
     Ok(role)
+}
+
+pub(crate) async fn get_catalog_role(
+    access_token: &str,
+    catalog_name: &str,
+    permission: &str,
+) -> Result<Option<String>, Error> {
+    let postgrest = Postgrest::new(POSTGREST_URL)
+        .insert_header("Authorization", "Bearer ".to_string() + access_token);
+
+    let organization = get_organization(access_token)?;
+
+    let mut role: Vec<Role> = postgrest
+        .from("catalog_permission")
+        .select("role_id")
+        .eq("organization_id", organization)
+        .eq("catalog_name", catalog_name)
+        .eq("permissions->>".to_string() + permission, "true")
+        .limit(1)
+        .execute()
+        .await?
+        .json()
+        .await?;
+
+    Ok(role.pop().map(|role| role.role_id))
 }
 
 pub(crate) async fn get_namespace_role(
@@ -123,46 +147,7 @@ pub(crate) async fn get_table_role(
     Ok(role.pop().map(|role| role.role_id))
 }
 
-pub(crate) async fn get_bucket(
-    access_token: &str,
-    catalog_name: &str,
-    table_namespace: &str,
-    table_name: &str,
-) -> Result<String, Error> {
-    let postgrest = Postgrest::new(POSTGREST_URL)
-        .insert_header("Authorization", "Bearer ".to_string() + access_token);
-
-    let organization = get_organization(access_token)?;
-
-    let mut table: Vec<Table> = postgrest
-        .from("tabular")
-        .select("metadata_location")
-        .eq("organization_id", organization)
-        .eq("catalog_name", catalog_name)
-        .eq("table_namespace", table_namespace)
-        .eq("table_name", table_name)
-        .eq("branch", "main")
-        .limit(1)
-        .execute()
-        .await?
-        .json()
-        .await?;
-
-    let metadata_location = table
-        .pop()
-        .ok_or(Error::EmptyResponse("iceberg tables".to_string()))?
-        .metadata_location;
-
-    let bucket = metadata_location
-        .trim_start_matches("s3://")
-        .split("/")
-        .next()
-        .ok_or(Error::Other("metadata location is empty".to_string()))?;
-
-    Ok(bucket.to_string())
-}
-
-fn get_organization(access_token: &str) -> Result<String, Error> {
+pub(crate) fn get_organization(access_token: &str) -> Result<String, Error> {
     let json = String::from_utf8(base64_url::decode(
         &access_token.split(".").collect::<Vec<_>>()[1],
     )?)?;
