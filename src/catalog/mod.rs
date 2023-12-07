@@ -3,11 +3,8 @@ use std::sync::Arc;
 pub mod aws;
 
 use async_trait::async_trait;
-use iceberg_catalog_nessie::{
-    apis::configuration::Configuration,
-    catalog::{NessieCatalog, ObjectStoreBuilder},
-};
-use iceberg_rust::catalog::{Catalog, CatalogList};
+use iceberg_catalog_nessie::{apis::configuration::Configuration, catalog::NessieCatalog};
+use iceberg_rust::catalog::{bucket::ObjectStoreBuilder, Catalog, CatalogList};
 use postgrest::Postgrest;
 use serde::Deserialize;
 
