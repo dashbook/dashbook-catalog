@@ -2,17 +2,17 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("network error")]
+    #[error(transparent)]
     Reqwest(#[from] reqwest::Error),
-    #[error("object store error")]
+    #[error(transparent)]
     ObjectStore(#[from] object_store::Error),
-    #[error("Base64url decode error")]
+    #[error(transparent)]
     Base64Url(#[from] base64_url::base64::DecodeError),
-    #[error("Utf8 encode error")]
+    #[error(transparent)]
     UTF8(#[from] std::string::FromUtf8Error),
-    #[error("json error")]
+    #[error(transparent)]
     JSON(#[from] serde_json::Error),
-    #[error("aws error")]
+    #[error(transparent)]
     AWS(
         #[from]
         aws_sdk_sts::error::SdkError<
