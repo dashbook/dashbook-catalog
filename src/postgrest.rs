@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use postgrest::Postgrest;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
@@ -8,35 +10,58 @@ pub(crate) static POSTGREST_URL: &str = "https://api.dashbook.dev/rest/v1";
 
 #[derive(Deserialize)]
 pub(crate) struct Role {
+    pub catalog_name: String,
     pub role_id: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Account {
+    pub catalog_name: String,
     pub cloud_account_id: String,
     pub cloud_region: String,
 }
 
-pub(crate) async fn get_account(access_token: &str, catalog_name: &str) -> Result<Account, Error> {
+pub(crate) async fn get_accounts(access_token: &str) -> Result<Vec<Account>, Error> {
     let postgrest = Postgrest::new(POSTGREST_URL)
         .insert_header("Authorization", "Bearer ".to_string() + access_token);
 
     let organization = get_organization(access_token)?;
 
-    let mut account: Vec<Account> = postgrest
+    let accounts: Vec<Account> = postgrest
         .from("catalog")
-        .select("cloud_account_id,cloud_region")
+        .select("catalog_name, cloud_account_id, cloud_region")
         .eq("organization_id", organization)
-        .eq("catalog_name", catalog_name)
-        .limit(1)
         .execute()
         .await?
         .json()
         .await?;
 
-    account
-        .pop()
-        .ok_or(Error::EmptyResponse("account".to_string()))
+    Ok(accounts)
+}
+
+pub(crate) async fn get_catalog_roles(
+    access_token: &str,
+    permission: &str,
+) -> Result<HashMap<String, String>, Error> {
+    let postgrest = Postgrest::new(POSTGREST_URL)
+        .insert_header("Authorization", "Bearer ".to_string() + access_token);
+
+    let organization = get_organization(access_token)?;
+
+    let roles: Vec<Role> = postgrest
+        .from("catalog_permission")
+        .select("catalog_name, role_id")
+        .eq("organization_id", organization)
+        .eq("permissions->>".to_string() + permission, "true")
+        .execute()
+        .await?
+        .json()
+        .await?;
+
+    Ok(roles.into_iter().fold(HashMap::new(), |mut acc, x| {
+        acc.entry(x.catalog_name).or_insert(x.role_id);
+        acc
+    }))
 }
 
 pub async fn get_role(
@@ -47,7 +72,7 @@ pub async fn get_role(
     permission: &str,
 ) -> Result<String, Error> {
     let role = match get_catalog_role(access_token, catalog_name, permission).await? {
-        None => match get_namespace_role(access_token, catalog_name, &table_namespace, permission)
+        None => match get_namespace_role(access_token, catalog_name, table_namespace, permission)
             .await?
         {
             None => get_table_role(
@@ -149,13 +174,15 @@ pub(crate) async fn get_table_role(
 
 pub(crate) fn get_organization(access_token: &str) -> Result<String, Error> {
     let json = String::from_utf8(base64_url::decode(
-        &access_token.split(".").collect::<Vec<_>>()[1],
+        &access_token.split('.').collect::<Vec<_>>()[1],
     )?)?;
     let claims: JsonValue = serde_json::from_str(&json)?;
 
     if let JsonValue::String(s) = &claims["organization"] {
         Ok(s.to_owned())
     } else {
-        Err(Error::Other(format!("Organization claim is not a string")))
+        Err(Error::Other(
+            "Organization claim is not a string".to_string(),
+        ))
     }
 }
